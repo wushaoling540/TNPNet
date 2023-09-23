@@ -75,12 +75,10 @@ class Averager():
 
 
 def roc_area_score(args, scores, targets, descending):
-    # sort 默认对最后一维的数据排序，返回(values, indices)
+    # sort default sorting the last dimension, return(values, indices)
     y_score, p = scores.sort(descending=descending)
     y_score = y_score.detach().cpu()
-    # closed 也按照排序完的dist
     y_true = targets[p]
-    # print(y_true)
     y_true = y_true.detach().cpu()
 
     # metric 1: auroc
