@@ -114,13 +114,13 @@ def prepare_model(args):
         model: the checkpoint model
     """
     model = TNPNet(args)  # should import the model_class object, or error: name 'model_class' is not defined
-    device = args.device  # config the device before load the checkpoint
+    device = args.device  # config the device before loading the checkpoint
 
     # load pre-trained model (no FC weights)
     model_dict = model.state_dict()
     if args.init_weights is not None and args.resume == 0:
         if torch.cuda.device_count() == 0:
-            pretrained_dict = torch.load(args.init_weights, map_location=torch.device(device))['params']  # if use cpu, config map_location
+            pretrained_dict = torch.load(args.init_weights, map_location=torch.device(device))['params']  # if use CPU, config map_location
         else:
             pretrained_dict = torch.load(args.init_weights)['params']
         if args.backbone_class == 'ConvNet':
@@ -164,7 +164,7 @@ def prepare_optimizer(model, args):
         )
 
     if args.lr_scheduler == 'step':
-        lr_scheduler = optim.lr_scheduler.StepLR(  # scheduler调度器, Decays the learning rate of each parameter
+        lr_scheduler = optim.lr_scheduler.StepLR(  # scheduler, Decays the learning rate of each parameter
                             optimizer,  # group by gamma every step_size epochs.
                             step_size=int(args.step_size),
                             gamma=args.gamma
