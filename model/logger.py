@@ -52,7 +52,7 @@ class Logger(object):
     def log_config(self, variant_data):
         config_filepath = osp.join(osp.dirname(self.logger_path), 'configs.json')
         with open(config_filepath, "w", encoding='utf-8') as fd:
-            # save_content + file_path + indent(2个缩进) + sort_by_initial +  ConfigEncoder_override
+            # save_content + file_path + indent(2retraction) + sort_by_initial +  ConfigEncoder_override
             json.dump(variant_data, fd, indent=2, sort_keys=True, cls=ConfigEncoder)
 
     def dump(self):
