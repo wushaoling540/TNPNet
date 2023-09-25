@@ -129,7 +129,7 @@ class FSLTrainer(Trainer):
         self.num_open  = args.n_task * args.way * args.open
         label_s, label_q, label_o, label_2cls = self.prepare_label()
         labels = label_s, label_q, label_o
-        # start FSL training
+        # start training
         for epoch in range(self.train_epoch + 1, args.max_epoch + 1):
             self.train_epoch += 1
             self.model.train_epoch = self.train_epoch
@@ -149,7 +149,7 @@ class FSLTrainer(Trainer):
                 data_tm = time.time()
                 self.dt.add(data_tm - start_tm)
 
-                # forward...get saved centers
+                # forward
                 klogits, ulogits = self.model((data, labels))
                 # get loss
                 loss_total, loss_main, loss_aux, loss_neg = self.loss(klogits, ulogits, labels)
@@ -162,10 +162,9 @@ class FSLTrainer(Trainer):
                 self.ft.add(forward_tm - data_tm)
 
                 # close-set accuracy
-                acc = count_acc(args, ulogits[:self.num_query], label_q)
-                # 有softmax
-                logits_predict = F.softmax(ulogits, dim=1)[:, -1]
+                acc = count_acc(args, ulogits[:self.num_query], label_q)                
                 # open-set auroc
+                logits_predict = F.softmax(ulogits, dim=1)[:, -1]
                 auroc, aupr, f_score, fpr95 = roc_area_score(args, logits_predict, label_2cls, True)
 
                 tl1.add(loss_total.item())
@@ -237,9 +236,9 @@ class FSLTrainer(Trainer):
                 # get loss for recording
                 loss_total, loss_main, loss_aux, loss_neg = self.loss(klogits, ulogits, labels)
                 # close-set accuracy
-                acc = count_acc(args, ulogits[:self.num_query], label_q)
+                acc = count_acc(args, ulogits[:self.num_query], label_q)                
+                # open-set auroc
                 logits_predict = F.softmax(ulogits, dim=1)[:, -1]
-                # open-set accuracy
                 auroc, aupr, f1_score, fpr95 = roc_area_score(args, logits_predict, label_2cls, True)
 
                 record[i - 1, 0] = loss_total.item()
