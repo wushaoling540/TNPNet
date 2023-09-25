@@ -14,19 +14,6 @@ class TNPNet(FewShotModel):
         self.bias = nn.Parameter(torch.FloatTensor(1).fill_(0), requires_grad=True)
         self.scale_cls = nn.Parameter(torch.FloatTensor(1).fill_(1), requires_grad=True)
 
-    def compute_logs_sigma(self, cluster_centers, data, sigma):
-        cluster_centers = cluster_centers.unsqueeze(1)
-        sigma = sigma.unsqueeze(1)
-        neg_dist = - torch.sum((data - cluster_centers) ** 2, -1)
-
-        logits = neg_dist / 2.0 / (sigma**2)
-        pi = torch.log(2 * torch.tensor([np.pi]))
-        if torch.cuda.device_count() > 0:
-            pi = pi.cuda()
-        norm_constant = 0.5 * pi + torch.log(sigma)
-        logits -= norm_constant
-        return logits
-
     def compute_positive_logs_sigma(self, cluster_centers, data, sigma):
         cluster_centers = cluster_centers.unsqueeze(1)
         sigma = sigma.unsqueeze(1)
@@ -39,14 +26,9 @@ class TNPNet(FewShotModel):
         logits += norm_constant
         return logits
 
-    def assign_cluster_sigma(self, cluster_centers, data, sigma):
-        logits = self.compute_logs_sigma(cluster_centers, data, sigma)
-        prob = F.softmax(logits, dim=-1)
-        return prob
-
     def update_cluster(self, data, prob):
         prob_sum = prob.sum(1, keepdim=True)
-        prob_sum += (prob_sum == 0.0).float() # 保证分母非0
+        prob_sum += (prob_sum == 0.0).float()
         prob2 = prob / prob_sum
         cluster_centers = (data * prob2.unsqueeze(-1)).sum(1) # Nt*N*1*(Ndim) x Nt*N*1*(Nw+1)
         return cluster_centers
@@ -67,25 +49,6 @@ class TNPNet(FewShotModel):
         scale_pro[:, :, -1] = self.args.vector * scale_pro[:, :, -1]
         similarity_score = torch.exp(-dis_ctx * scale_pro)
         return similarity_score
-
-    def augment_proto(self, protos, support, label_s, query_open, pseudo_label):
-        n_task, n_proto, emb_dim = protos.shape
-        for i in range(n_proto):
-            current_supports = support[torch.where(label_s == i)].view(n_task, -1, emb_dim)
-            selected_samples = query_open[torch.where(pseudo_label == i)].view(n_task, -1, emb_dim)
-            if selected_samples.shape[1] == 0 and current_supports.shape[1] == 0:
-                selected_samples = torch.zeros_like(protos[:, 0:1, :])
-            protos[:, i] = torch.cat((current_supports, selected_samples), dim=1).mean(1)
-        return protos
-
-    def context_learning(self, query_open, protos, support, label_s):
-        n_task, n_proto, emb_dim = protos.shape
-        dis = torch.sum((query_open - protos) ** 2, -1)
-        similarity_score = self.context_score_learning(dis, n_proto)
-        pseudo_score, pseudo_label = similarity_score.max(dim=-1)
-        # augment proto
-        protos = self.augment_proto(protos, support, label_s, query_open, pseudo_label)
-        return protos
 
     def transductive_learning(self, support, label_s, query_open, kproto):
         n_task, n_kproto, emb_dim = kproto.shape
