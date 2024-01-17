@@ -69,58 +69,6 @@ class FSLTrainer(Trainer):
             label_2cls = label_2cls.type(torch.LongTensor).cuda()
         return label_s, label_q, label_o, label_2cls
 
-    def loss(self, klogits, ulogits, labels):
-        args = self.args
-        label_s, label_q, label_o = labels
-        logits_closed, logits_open = klogits[:self.num_query], klogits[self.num_query:]
-        ulogits_closed, ulogits_open = ulogits[:self.num_query], ulogits[self.num_query:]
-        cls_labels = torch.cat([label_q, label_o], dim=0)
-
-        loss_aux, loss_neg = torch.Tensor([0.0]), torch.Tensor([0.0])
-        if torch.cuda.device_count() > 0:
-            loss_aux, loss_neg = loss_aux.cuda(), loss_neg.cuda()
-
-        # main loss with  weight:
-        weight = torch.ones(self.args.n_task, ulogits.shape[1])
-        for i in range(ulogits.shape[1]):
-            proportion = torch.where(cls_labels.view(self.args.n_task, -1) == i)[0].shape[0]
-            if proportion == 0:
-                weight[:, i] = torch.ones(1)
-            else:
-                weight[:, i] = torch.ones(1) / proportion
-        weight = F.softmax(weight, dim=-1)
-        weight = weight.view(-1)
-        if torch.cuda.device_count() > 0:
-            weight = weight.cuda()
-        loss = F.cross_entropy(ulogits, cls_labels, weight)
-
-        # auxiliary loss:
-        dummpylogits = ulogits_closed.clone()
-        for i in range(len(ulogits_closed)):
-            nowlabel = label_q[i]
-            dummpylogits[i][nowlabel] = -1e9
-        dummytargets = args.way * torch.ones_like(label_q)
-        loss_aux = F.cross_entropy(dummpylogits, dummytargets)
-
-        # negative loss:
-        loss_neg = F.softmax(logits_open, dim=-1) * F.log_softmax(logits_open, dim=-1)  # (N, Nw)
-        loss_neg = F.cross_entropy(logits_closed, label_q)+ loss_neg.sum(-1).mean()
-
-        # eta and mu
-        loss_scale_aux_lut = [[20000], [0.5]]
-        loss_scale_neg_lut = [[2000, 5000, 10000, 20000], [0.5, 0.3, 0.1, 0]]
-        for i in range(len(loss_scale_aux_lut[0])):
-            if self.train_step < loss_scale_aux_lut[0][i]:
-                loss_scale_aux = loss_scale_aux_lut[1][i]
-                break
-        for i in range(len(loss_scale_neg_lut[0])):
-            if self.train_step < loss_scale_neg_lut[0][i]:
-                loss_scale_neg = loss_scale_neg_lut[1][i]
-                break
-
-        loss_total = loss + loss_scale_aux * loss_aux + loss_scale_neg * loss_neg
-
-        return loss_total, loss, loss_aux, loss_neg
 
     def train(self):
         args = self.args
